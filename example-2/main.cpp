@@ -108,7 +108,7 @@ void	syncsignalHandler (bool b, void *userData) {
 //	ensemble
 static
 void	ensemblenameHandler (std::string name, int Id, void *userData) {
-	fprintf (stderr, "ensemble %s is (%X) recognized\n",
+	fprintf (stdout, "@ensemble;%s;%X\n",
 	                          name. c_str (), (uint32_t)Id);
 	ensembleRecognized. store (true);
 }
@@ -122,6 +122,7 @@ std::vector<int> programSIds;
 std::unordered_map <int, std::string> ensembleContents;
 static
 void	programnameHandler (std::string s, int SId, void *userdata) {
+	fprintf (stdout, "@program;%s;%X\n", s. c_str (), SId);
 	for (std::vector<std::string>::iterator it = programNames.begin();
 	             it != programNames. end(); ++it)
 	   if (*it == s)
@@ -529,9 +530,18 @@ bool	err;
 	std::cerr << "we try to start program " <<
                                                  programName << "\n";
 	audiodata ad;
+/*
 	if (!is_audioService (theRadio, programName. c_str ())) {
 	   std::cerr << "sorry  we cannot handle service " << 
 	                                         programName << "\n";
+
+//	if (serviceIdentifier != -1)
+//	   programName = theRadio -> dab_getserviceName (serviceIdentifier);
+
+//	if (theRadio -> dab_service (programName) < 0) {
+//	   fprintf (stderr, "sorry  we cannot handle service %s\n", 
+//	                                             programName. c_str ());
+
 	   run. store (false);
 	}
 
@@ -549,9 +559,13 @@ bool	err;
 	   dabReset_msc (theRadio);
 	   set_audioChannel (theRadio, &ad);
 	}
+*/
 
+	run.load();
+/*
 	while (run. load ())
 	   sleep (1);
+   */
 	theDevice	-> stopReader ();
 	dabReset (theRadio);
 	dabExit  (theRadio);
