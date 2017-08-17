@@ -87,14 +87,14 @@ void	syncsignalHandler (bool b, void *userData) {
 //	ensemble
 static
 void	ensemblenameHandler (std::string name, int Id, void *userData) {
-	fprintf (stderr, "ensemble %s is (%X) recognized\n",
+	fprintf (stdout, "@ensemble;%s;%X\n",
 	                          name. c_str (), (uint32_t)Id);
 	ensembleRecognized. store (true);
 }
 
 static
 void	programnameHandler (std::string s, int SId, void * userdata) {
-	fprintf (stderr, "%s (%X) is part of the ensemble\n", s. c_str (), SId);
+	fprintf (stdout, "@program;%s;%X\n", s. c_str (), SId);
 }
 
 static
@@ -331,9 +331,16 @@ std::string	fileName;
 
 	if (!ensembleRecognized. load ())
 	   while (!ensembleRecognized. load () && (++timeOut < latency)) {
-	      fprintf (stderr, "%d\r", latency - timeOut);
+	      fprintf (stderr, "%d \r", latency - timeOut);
 	      sleep (1);
 	   }
+	   
+	   // wait the full time to ensure it populates all channels
+	   while (++timeOut < latency) {
+	      fprintf (stderr, "%d \r", latency - timeOut);
+	      sleep (1);
+	   }
+	   
 	fprintf (stderr, "\n");
 
 	if (!ensembleRecognized. load ()) {
@@ -350,14 +357,19 @@ std::string	fileName;
 	run. store (true);
 	if (serviceIdentifier != -1) 
 	   programName = theRadio -> dab_getserviceName (serviceIdentifier);
+/*
 	if (theRadio -> dab_service (programName) < 0) {
 	   fprintf (stderr, "sorry  we cannot handle service %s\n", 
 	                                             programName. c_str ());
 	   run. store (false);
 	}
+*/
 
+	run.load();
+/*
 	while (run. load ())
 	   sleep (1);
+   */
 	theDevice	-> stopReader ();
 	theRadio	-> reset ();
 	delete theRadio;
