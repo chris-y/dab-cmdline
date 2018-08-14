@@ -23,67 +23,40 @@
 #define	__OFDM_DECODER__
 
 #include	<stdint.h>
-#include	<thread>
-#include	<mutex>
-#include	<condition_variable>
+#include	<vector>
 #include	<atomic>
 #include	"dab-constants.h"
-#include	"fft.h"
 #include	"ringbuffer.h"
 #include	"phasetable.h"
 #include	"freq-interleaver.h"
-#include	"semaphore.h"
+#include	"fft_handler.h"
 
-class	ficHandler;
-class	mscHandler;
 class	dabParams;
 
 class	ofdmDecoder {
 public:
-		ofdmDecoder		(dabParams *,
-                                         RingBuffer<std::complex<float>> *,
-	                                 ficHandler	*,
-	                                 mscHandler	*);
+		ofdmDecoder		(uint8_t	dabMode,
+                                         RingBuffer<std::complex<float>> *);
 		~ofdmDecoder		(void);
 	void	processBlock_0		(std::complex<float> *);
-	void	decodeFICblock		(std::complex<float> *, int32_t n);
-	void	decodeMscblock		(std::complex<float> *, int32_t n);
+	void	decode		(std::complex<float> *, int32_t n, int16_t *);
 	int16_t	get_snr			(void);
-	void	stop			(void);
-	void	start			(void);
 private:
+	dabParams	params;
+	fft_handler	my_fftHandler;
+	interLeaver	myMapper;
 	int16_t		get_snr		(std::complex<float> *);
-	dabParams	*params;
         RingBuffer<std::complex<float>> *iqBuffer;
-	ficHandler	*my_ficHandler;
-	mscHandler	*my_mscHandler;
-	Semaphore	bufferSpace;
-	std::thread	threadHandle;
-	std::mutex	myMutex;
-	std::mutex	ourMutex;
-	std::condition_variable	Locker;
-	void		run		(void);
-	std::atomic<bool>	running;
-	std::complex<float>	**command;
-	int16_t		amount;
 	int		cnt;
-	int16_t		currentBlock;
-	void		processBlock_0		(void);
-	void		decodeFICblock		(int32_t n);
-	void		decodeMscblock		(int32_t n);
 	int32_t		T_s;
 	int32_t		T_u;
 	int32_t		T_g;
 	int32_t		carriers;
 	int32_t		nrBlocks;
 	int16_t		getMiddle	(void);
-	std::complex<float>	*phaseReference;
-	common_fft	*fft_handler;
+	std::vector <complex<float> >	phaseReference;
 	std::complex<float>	*fft_buffer;
-	interLeaver	myMapper;
-	phaseTable	*phasetable;
 	int32_t		blockIndex;
-	int16_t		*ibits;
 	float		current_snr;
 };
 

@@ -29,14 +29,18 @@
 
 #include	<stdio.h>
 #include	<stdint.h>
-#include	<stdio.h>
+#include	<thread>
+#include	<vector>
 #include	<mutex>
-#include	<condition_variable>
+#include	<atomic>
 #include	"dab-constants.h"
 #include	"dab-api.h"
 #include	"dab-params.h"
+#include	"freq-interleaver.h"
+#include	"fft_handler.h"
+#include	"semaphore.h"
 
-class	dabVirtual;
+class	virtualBackend;
 
 using namespace std;
 class mscHandler {
@@ -44,50 +48,48 @@ public:
 		mscHandler		(uint8_t,
 	                                 audioOut_t,
 	                                 dataOut_t,
+	                                 bytesOut_t,
 	                                 programQuality_t,
+	                                 motdata_t,
 	                                 void		*);
 		~mscHandler		(void);
-	void	process_mscBlock	(int16_t *, int16_t);
+	void	process_mscBlock	(std::complex<float> *, int16_t);
 	void	set_audioChannel	(audiodata	*);
 	void	set_dataChannel		(packetdata     *);
-	void	stopProcessing		(void);
-	void	stopHandler		(void);
+	void	reset			(void);
+	void	stop			(void);
+	void	start			(void);
 private:
+virtual	void		run		(void);
+	void		process_mscBlock (std::vector<int16_t>, int16_t);
+	dabParams	params;
+	fft_handler	my_fftHandler;
+	std::complex<float>	*fft_buffer;
+	interLeaver	myMapper;
 	audioOut_t	soundOut;
 	dataOut_t	dataOut;
+	bytesOut_t	bytesOut;
 	programQuality_t programQuality;
+	motdata_t	motdata_Handler;
 	void		*userData;
-	dabParams	params;
+	Semaphore       freeSlots;
+        Semaphore       usedSlots;
+        std::complex<float>  **theData;
+	std::atomic<bool>	running;
+
+	std::thread	threadHandle;
+	std::vector<complex<float> > phaseReference;
 	bool		audioService;
 	std::mutex	mutexer;
-	dabVirtual	*dabHandler;
-	int16_t		*cifVector;
+	std::vector<virtualBackend *>theBackends;
+//	std::vector<int16_t> cifVector;
 	int16_t		cifCount;
 	int16_t		blkCount;
-	bool		work_to_be_done;
-	bool		newChannel;
-	int16_t		new_packetAddress;
-	int16_t		new_appType;
-	int16_t		new_ASCTy;
-	int16_t		new_DSCTy;
-	int16_t		new_startAddr;
-	int16_t		new_Length;
-	bool		new_shortForm;
-	int16_t		new_protLevel;
-	uint8_t		new_DGflag;
-	int16_t		new_bitRate;
-	int16_t		new_language;
-	int16_t		new_type;
-	int16_t		new_FEC_scheme;
-	int16_t		startAddr;
-	int16_t		Length;
-	int8_t		dabModus;
-	int8_t		new_dabModus;
+	std::atomic<bool> work_to_do;
 	int16_t		BitsperBlock;
 	int16_t		numberofblocksperCIF;
 	int16_t		blockCount;
 };
 
 #endif
-
 

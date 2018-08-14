@@ -25,8 +25,8 @@
 #define	__FREQ_INTERLEAVER__
 #include	<stdint.h>
 #include	"dab-constants.h"
+#include	"dab-params.h"
 
-class	dabParams;
 /**
   *	\class interLeaver
   *	Implements frequency interleaving according to section 14.6
@@ -34,11 +34,13 @@ class	dabParams;
   */
 class	interLeaver {
 public:
-	interLeaver	(dabParams *);
-	~interLeaver	(void);
-int16_t	mapIn		(int16_t);
+		interLeaver	(uint8_t);
+		~interLeaver	(void);
+	int16_t	mapIn		(int16_t);
 private:
-
+	dabParams	params;
+	void	createMapper	(int16_t, int16_t,
+                                 int16_t, int16_t, int16_t *);
 	int16_t	*permTable;
 };
 

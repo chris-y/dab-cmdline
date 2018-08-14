@@ -31,7 +31,7 @@
 #include	<stdio.h>
 #include	<stdint.h>
 #include	<math.h>
-#include	"dab-processor.h"
+#include	"backend-base.h"
 #include	"pad-handler.h"
 #include	<stdio.h>
 #include	"ringbuffer.h"
@@ -47,12 +47,13 @@ struct quantizer_spec {
 	uint8_t cw_bits;
 };
 
-class	mp2Processor: public dabProcessor {
+class	mp2Processor: public backendBase {
 public:
 			mp2Processor	(int16_t,
 	                                 audioOut_t,
 	                                 dataOut_t,
 	                                 programQuality_t,
+	                                 motdata_t,
 	                                 void	*);
 			~mp2Processor	(void);
 	void		addtoFrame	(uint8_t *);

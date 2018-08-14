@@ -18,36 +18,35 @@
  *    You should have received a copy of the GNU General Public License
  *    along with DAB-library; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
  */
 #
 #ifndef	__PHASEREFERENCE__
 #define	__PHASEREFERENCE__
 
-#include	"fft.h"
 #include	<stdio.h>
 #include	<stdint.h>
+#include	<vector>
 #include	"phasetable.h"
 #include	"dab-constants.h"
-
-class	dabParams;
+#include	"fft_handler.h"
+#include	"dab-params.h"
 
 class phaseReference : public phaseTable {
 public:
-		phaseReference (dabParams *, int16_t);
+		phaseReference (uint8_t, int16_t, int16_t);
 		~phaseReference	(void);
 	int32_t	findIndex	(std::complex<float> *);
-	std::complex<float>	*refTable;
+	int16_t	estimateOffset	(std::complex<float> *);
 private:
-	int32_t		T_u;
-	int16_t		threshold;
+	std::vector<std::complex<float>>        refTable;
+	std::vector<float>      phaseDifferences;
+	dabParams		params;
+	int32_t			T_u;
+	int16_t			threshold;
+	int16_t			diff_length;
 
-	common_fft	*fft_processor;
-	std::complex<float>	*fft_buffer;
-	common_ifft	*res_processor;
-	std::complex<float>	*res_buffer;
-	int32_t		fft_counter;
-	float	Max;
+	fft_handler	my_fftHandler;
+	std::complex<float>     *fft_buffer;
 };
 #endif
 

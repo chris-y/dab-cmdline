@@ -22,19 +22,21 @@
 
 #include	"tdc-datahandler.h"
 
-	tdc_dataHandler::tdc_dataHandler (int16_t appType) {
+	tdc_dataHandler::tdc_dataHandler (int16_t appType,
+	                                  bytesOut_t bytesOut,
+	                                  void	*ctx) {
+	this	-> bytesOut	= bytesOut;
+	this	-> ctx		= ctx;
 }
 
 	tdc_dataHandler::~tdc_dataHandler (void) {
 }
 
 void	tdc_dataHandler::add_mscDatagroup (std::vector<uint8_t> m) {
-//void    tdc_dataHandler::add_mscDatagroup (QByteArray &m) {
 int32_t offset  = 0;
 uint8_t *data   = (uint8_t *)(m. data ());
 int32_t size    = m. size ();
 int16_t i;
-uint16_t        crc;
 
 //      we maintain offsets in bits, the "m" array has one bit per byte
         while (offset < size) {
@@ -49,9 +51,10 @@ uint16_t        crc;
               return;
 
 //      we have a syncword
-           uint16_t syncword    = getBits (data, offset,      16);
-           int16_t length       = getBits (data, offset + 16, 16);
-           uint16_t crc         = getBits (data, offset + 32, 16);
+//	   uint16_t syncword    = getBits (data, offset,      16);
+	   int16_t length       = getBits (data, offset + 16, 16);
+//	   uint16_t crc         = getBits (data, offset + 32, 16);
+
            uint8_t frametypeIndicator =
                                   getBits (data, offset + 48,  8);
            if ((length < 0) || (length >= (size - offset) / 8))
@@ -85,7 +88,7 @@ uint16_t        crc;
               offset = handleFrame_type_1 (data, offset + 7 * 8, length);
            else
               return;   // failure
-	   fprintf (stderr, "offset is now %d\n", offset);
+//	   fprintf (stderr, "offset is now %d\n", offset);
 	   if (offset < 0)
 	      return;
         }
@@ -95,51 +98,26 @@ int32_t tdc_dataHandler::handleFrame_type_0 (uint8_t *data,
                                             int32_t offset, int32_t length) {
 int16_t i;
 int16_t noS     = getBits (data, offset, 8);
-        fprintf (stderr, "frametype 0 :");
-        for (i = 0; i < noS; i ++)
-            fprintf (stderr, "%o %o %o   ", getBits (data, offset + 8, 8),
-                                            getBits (data, offset + 16, 8),
-                                            getBits (data, offset + 24, 8));
-        fprintf (stderr, "\n");
-        return offset + length * 8;
+uint8_t	buffer [length];
+
+	for (i = 0; i < length; i ++)
+	   buffer [i] = getBits (data, offset + i * 8, 8);
+
+	if (bytesOut != nullptr)
+	   bytesOut (buffer, length, 0, ctx);
+	return offset + length * 8;
 }
 
 int32_t tdc_dataHandler::handleFrame_type_1 (uint8_t *data,
                                              int32_t offset, int32_t length) {
 int16_t i;
-        fprintf (stderr, " frametype 1 met %o %o %o\n",
-                                     getBits (data, offset,      8),
-                                     getBits (data, offset + 8,  8),
-                                     getBits (data, offset + 16, 8));
+uint8_t	buffer [length];
 
-        fprintf (stderr, "encryption %d\n", getBits (data, offset + 24, 8));
-        if (getBits (data, offset + 24, 8) == 0) {      // encryption 0
-           int llength = length - 5;
-           int loffset = offset + 32;
-           do {
-              fprintf (stderr, "component identifier = %d\n",
-                                            getBits (data, loffset + 0, 8));
-              fprintf (stderr, "fieldlength = %d\n",
-                                            getBits (data, loffset + 8, 16));
-              fprintf (stderr, "header crc = %o\n",
-                                            getBits (data, loffset + 24, 16));
-              if (serviceComponentFrameheaderCRC (data, loffset, llength))
-                 fprintf (stderr, "ready to handle component frame\n");
-              else
-                 fprintf (stderr, "crc check failed\n");
-              if (getBits (data, loffset + 0, 8) == 0) {
-                 for (i = 0; i < 30; i ++)
-                    fprintf (stderr, "%o ", getBits (data, loffset + 40 + 8 * i, 8));
-                 fprintf (stderr, "\n");
-              }
-              int16_t fieldLength = getBits (data, loffset + 8, 16);
-              llength -= fieldLength + 5;
-              loffset += fieldLength * 8 + 5 * 8;
-           } while (llength > 0);
-        }
-        else
-           fprintf (stderr, "need to decompress\n");
+	for (i = 0; i < length; i ++)
+	   buffer [i] = getBits (data, offset + i * 8, 8);
 
+	if (bytesOut != nullptr)
+	   bytesOut (buffer, length, 1, ctx);
         return offset + length * 8;
 }
 

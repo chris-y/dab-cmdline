@@ -2,7 +2,7 @@
 /*
  *    Copyright (C) 2017
  *    Jan van Katwijk (J.vanKatwijk@gmail.com)
- *    Lazy Chair Programming
+ *    Lazy Chair Computing
  *
  *    This file is the python wrapper for the DAB-library.
  *    DAB-library is free software; you can redistribute it and/or modify
@@ -69,6 +69,9 @@ deviceHandler *theDevice;
 //	                                 bool,		// stereo
 //	                                 void *);	// context
 //	typedef	void (*dataOut_t)	(std::string,
+//	                                 void *);
+//	typedef void (*bytesOut_t)	(uint8_t *, 
+//	                                 int16_t,
 //	                                 void *);
 //	typedef	void (*systemdata_t)	(bool,
 //	                                 int16_t,
@@ -296,8 +299,10 @@ PyGILState_STATE gstate;
 //	                   fib_quality_t       fib_qualityHandler,
 //	                   audioOut_t          audioOut_Handler,
 //	                   dataOut_t           dataOut_Handler,
+//	                   bytesOut_t	       bytesOut_Handler,
 //	                   programdata_t       programdataHandler,
 //	                   programQuality_t    program_qualityHandler,
+//			   void		       *s,
 //	                   void                *userData);
 
 
@@ -434,21 +439,21 @@ void	*result;
 	                                      3,
 	                                      theGain,
 	                                      true,
-	                                      0, 0);
+	                                      0,
+	                                      0);
 #elif	HAVE_AIRSPY
 	   theDevice	= new airspyHandler (frequency,
 	                                     0,
 	                                     theGain);
 #elif	HAVE_RTLSDR
 	   theDevice	= new rtlsdrHandler (frequency,
-	                                     0,
-	                                     theGain,
-	                                     false,
-	                                     0);
+	                                     0,		// ppm offset
+	                                     theGain,	// the gain
+	                                     false);	// autogain
 #else
-	   theDevice	= new devicehandler ();
+	   theDevice	= new deviceHandler ();
 #endif
-
+	fprintf (stderr, "device installed\n");
 	}
 	catch (int e) {
 	   fprintf (stdout, "allocating device failed\n");
@@ -456,8 +461,8 @@ void	*result;
 	}
 	result = dabInit (theDevice,
 	                  theMode,
-	                  NULL,
-	                  NULL,
+	                  NULL,			// no spectrum shown
+	                  NULL,			// no constellation
 	                  (syncsignal_t)	&callback_syncSignal,
 	                  (systemdata_t)	&callback_systemData,
 	                  (ensemblename_t)	&callback_ensembleName,
@@ -465,14 +470,24 @@ void	*result;
 	                  (fib_quality_t)	&callback_fibQuality,
 	                  (audioOut_t)		&callback_audioOut,
 	                  (dataOut_t)		&callback_dataOut,
+	                  (bytesOut_t)	        NULL,
 	                  (programdata_t)	&callback_programdata,
 	                  (programQuality_t)	&callback_programQuality,
+	                  NULL,			// no mot slides
 	                  NULL
 	                 );
 	if (result == NULL) {
 	   fprintf (stdout, "Sorry, did not work\n");
 	   goto err;
 	}
+
+	theDevice       -> setGain (theGain);
+//	if (autogain)
+//	   theDevice    -> set_autogain (autogain);
+        theDevice       -> setVFOFrequency (frequency);
+        theDevice       -> restartReader ();
+//
+
 	return PyCapsule_New (result, "library_object", NULL);
 
 err:
@@ -539,13 +554,11 @@ PyObject *dabService_p (PyObject *self, PyObject *args) {
 PyObject	*handle_capsule;
 void		*handle;
 char		*s;
-std::string	ss;
 
 	PyArg_ParseTuple (args, "sO", &s, &handle_capsule);
 	fprintf (stdout, "%s zou moeten worden gestart\n", s);
-	ss	= std::string (s);
 	handle = PyCapsule_GetPointer (handle_capsule, "library_object");
-	dabService (ss, handle);
+	dabService (s, handle);
 	Py_RETURN_NONE;
 }
 

@@ -22,9 +22,8 @@
 #
 #include	"dab-constants.h"
 #include	"msc-handler.h"
-#include	"dab-virtual.h"
-#include	"dab-audio.h"
-#include	"dab-data.h"
+#include	"audio-backend.h"
+#include	"data-backend.h"
 #include	"dab-params.h"
 //
 //	Interface program for processing the MSC.
@@ -35,44 +34,137 @@
 
 #define	CUSize	(4 * 16)
 //	Note CIF counts from 0 .. 3
-//
-		mscHandler::mscHandler	(uint8_t	Mode,
+
+static
+int16_t	cifVector [55296];
+
+static int blocksperCIF [] = {18, 72, 0, 36};
+
+		mscHandler::mscHandler	(uint8_t	dabMode,
 	                                 audioOut_t	soundOut,
 	                                 dataOut_t	dataOut,
+	                                 bytesOut_t	bytesOut,
 	                                 programQuality_t mscQuality,
+	                                 motdata_t	motdata_Handler,
 	                                 void		*userData):
-	                                    params (Mode) {
-	this	-> soundOut	= soundOut;
-	this	-> dataOut	= dataOut;
+	                                    params (dabMode),
+	                                    my_fftHandler (dabMode),
+	                                    myMapper (dabMode),
+	                                    freeSlots (params. get_L ()) {
+	this	-> soundOut		= soundOut;
+	this	-> dataOut		= dataOut;
+	this	-> bytesOut		= bytesOut;
 	this	-> programQuality	= mscQuality;
+	this	-> motdata_Handler	= motdata_Handler;
 	this	-> userData		= userData;
+	theData				= new std::complex<float> *[params. get_L ()];
+	for (int i = 0; i < params. get_L (); i ++)
+	   theData [i] = new std::complex<float> [params. get_T_u ()];
 
-	cifVector		= new int16_t [55296];
+//	cifVector. resize (55296);
 	cifCount		= 0;	// msc blocks in CIF
 	blkCount		= 0;
-	dabHandler		= new dabVirtual;
-	newChannel		= false;
-	work_to_be_done		= false;
-	dabModus		= 0;
+	theBackends. push_back (new virtualBackend (0, 0));
 	BitsperBlock		= 2 * params. get_carriers ();
-	if (Mode == 4)	// 2 CIFS per 76 blocks
-	   numberofblocksperCIF	= 36;
-	else
-	if (Mode == 1)	// 4 CIFS per 76 blocks
-	   numberofblocksperCIF	= 18;
-	else
-	if (Mode == 2)	// 1 CIF per 76 blocks
-	   numberofblocksperCIF	= 72;
-	else			// shouldnot/cannot happen
-	   numberofblocksperCIF	= 18;
+	numberofblocksperCIF	= blocksperCIF [(dabMode - 1) & 03];
 
-	audioService		= true;		// default
+	work_to_do. store (false);
+	running. store (false);
+	phaseReference. resize (params. get_T_u ());
 }
 
-		mscHandler::~mscHandler	(void) {
-	delete[]  cifVector;
-	dabHandler	-> stopRunning ();
-	delete	dabHandler;
+	mscHandler::~mscHandler	(void) {
+	stop ();
+	for (int i = 0; i < params. get_L (); i ++)
+	   delete [] theData [i];
+	delete [] theData;
+}
+
+void	mscHandler::stop (void) {
+	if (running. load ()) {
+	   running. store (false);
+	   threadHandle. join ();
+	}
+
+	mutexer. lock ();
+	for (auto const &b : theBackends) {
+	   b -> stopRunning ();
+	   delete b;
+	}
+
+	theBackends. resize (0);
+	work_to_do. store (false);
+	mutexer. unlock ();
+}
+
+void	mscHandler::start	(void) {
+	if (running.load ()) {
+	   fprintf (stderr, "cannot restart mscHandler, still active\n");
+	   return;
+	}
+	else
+	   fprintf (stderr, "starting mscHandler\n");
+	threadHandle = std::thread (&mscHandler::run, this);
+}
+
+void	mscHandler::reset	(void) {
+	stop ();
+	start ();
+}
+
+//	The exteral world sees this
+void    mscHandler::process_mscBlock (std::complex<float> *b, int16_t blkno) {
+	while (running. load ())
+	   if (freeSlots. tryAcquire (200))
+	      break;
+
+	if (!running. load ())
+	   return;
+	memcpy (theData [blkno], b,
+	            params. get_T_u () * sizeof (std::complex<float>));
+	usedSlots. Release ();
+}
+
+void	mscHandler::run       (void) {
+int	currentBlock	= 0;
+std::vector<int16_t> ibits;
+
+	running. store (true);
+	fft_buffer	= my_fftHandler. getVector ();
+	ibits. resize (BitsperBlock);
+	while (running. load ()) {
+	   while (!usedSlots. tryAcquire (200))
+	      if (!running)
+	         return;
+	   memcpy (fft_buffer, theData [currentBlock],
+	                 params. get_T_u () * sizeof (std::complex<float>));
+
+//      block 3 and up are needed as basis for demodulation the "mext" block
+//      "our" msc blocks start with blkno 4
+	   my_fftHandler. do_FFT (fft_handler::fftForward);
+	   if (currentBlock >= 4) {
+	      for (int i = 0; i < params. get_carriers (); i ++) {
+	         int16_t      index   = myMapper. mapIn (i);
+	         if (index < 0)
+	            index += params. get_T_u ();
+
+	         std::complex<float>  r1 = fft_buffer [index] *
+	                               conj (phaseReference [index]);
+	         float ab1    = jan_abs (r1);
+//	Recall:  the viterbi decoder wants 127 max pos, - 127 max neg
+//	we make the bits into softbits in the range -127 .. 127
+	         ibits [i]            =  - real (r1) / ab1 * 127.0;
+	         ibits [params. get_carriers () + i]
+	                                 =  - imag (r1) / ab1 * 127.0;
+	      }
+	      process_mscBlock (ibits, currentBlock);
+	   }
+
+	   memcpy (phaseReference. data (), fft_buffer,
+	                 params. get_T_u () * sizeof (std::complex<float>));
+	   freeSlots. Release ();
+	   currentBlock = (currentBlock + 1) % (params. get_L ());
+	}
 }
 
 //
@@ -83,118 +175,57 @@
 //	thread executing process_mscBlock
 void	mscHandler::set_audioChannel (audiodata *d) {
 	mutexer. lock ();
-	audioService	= true;
-	new_shortForm	= d	-> shortForm;
-	new_startAddr	= d	-> startAddr;
-	new_Length	= d	-> length;
-	new_protLevel	= d	-> protLevel;
-	new_bitRate	= d	-> bitRate;
-	new_language	= d	-> language;
-	new_type	= d	-> programType;
-	new_ASCTy	= d	-> ASCTy;
-	new_dabModus	= new_ASCTy == 077 ? DAB_PLUS : DAB;
-	newChannel	= true;
+//
+//	we could assert here that theBackend == nullptr
+	theBackends. push_back (new audioBackend (d,
+	                                    soundOut,
+	                                    dataOut,
+	                                    programQuality,
+	                                    motdata_Handler,
+	                                    userData));
+	work_to_do. store (true);
 	mutexer. unlock ();
 }
 
 
-void	mscHandler::set_dataChannel (packetdata	*d) {
+void	mscHandler::set_dataChannel (packetdata *d) {
 	mutexer. lock ();
-	audioService	= false;
-	new_shortForm	= d	-> shortForm;
-	new_startAddr	= d	-> startAddr;
-	new_Length	= d	-> length;
-	new_protLevel	= d	-> protLevel;
-	new_DGflag	= d	-> DGflag;
-	new_bitRate	= d	-> bitRate;
-	new_FEC_scheme	= d	-> FEC_scheme;
-	new_DSCTy	= d	-> DSCTy;
-	new_packetAddress = d	-> packetAddress;
-	new_appType	= d	-> appType;
-	newChannel	= true;
+	theBackends. push_back (new dataBackend (d,
+	                                   bytesOut,
+	                                   motdata_Handler,
+	                                   userData));
+	work_to_do. store (true);
 	mutexer. unlock ();
 }
 
-//
-//	add blocks. First is (should be) block 5, last is (should be) 76
-//	Note that this method is called from within the ofdm-processor thread
-//	while the set_xxx methods are called from within the 
-//	gui thread
-//
-//	Any change in the selected service will only be active
-//	during te next process_mscBlock call.
-void	mscHandler::process_mscBlock	(int16_t *fbits,
+void	mscHandler::process_mscBlock	(std::vector<int16_t> fbits,
 	                                 int16_t blkno) { 
 int16_t	currentblk;
-int16_t	*myBegin;
 
-	if (!work_to_be_done && !newChannel)
-	   return;
-
+//	we accept the incoming data
 	currentblk	= (blkno - 4) % numberofblocksperCIF;
-//
-	if (newChannel) {
-	   mutexer. lock ();
-	   newChannel	= false;
-	   dabHandler -> stopRunning ();
-	   delete dabHandler;
-
-	   if (audioService) {
-	      dabHandler = new dabAudio (new_dabModus,
-	                                 new_Length * CUSize,
-	                                 new_bitRate,
-	                                 new_shortForm,
-	                                 new_protLevel,
-	                                 soundOut,
-	                                 dataOut,
-	                                 programQuality,
-	                                 userData
-	                           );
-	   }
-	   else {
-	      dabHandler = new dabData (new_DSCTy,
-	                                new_appType,
-	                                new_packetAddress,
-	                                new_Length * CUSize,
-	                                new_bitRate,
-	                                new_shortForm,
-	                                new_protLevel,
-	                                new_DGflag,
-	                                new_FEC_scheme,
-	                                false);
-	   }
-//
-//	these we need for actual processing
-	   startAddr	= new_startAddr;
-	   Length	= new_Length;
-//	and this one to get started
-	   work_to_be_done	= true;
-	   mutexer. unlock ();
-	}
-//
-//	and the normal operation is:
 	memcpy (&cifVector [currentblk * BitsperBlock],
-	                    fbits, BitsperBlock * sizeof (int16_t));
+	                    fbits. data (), BitsperBlock * sizeof (int16_t));
 	if (currentblk < numberofblocksperCIF - 1) 
 	   return;
-//
+
+	if (!work_to_do. load ())
+	   return;
 //	OK, now we have a full CIF
+	mutexer. lock ();
 	blkCount	= 0;
 	cifCount	= (cifCount + 1) & 03;
-	myBegin		= &cifVector [startAddr * CUSize];
-//	Here we move the vector to be processed to a
-//	separate task or separate function, depending on
-//	the settings in the ini file, we might take advantage of multi cores
-	(void) dabHandler -> process (myBegin, Length * CUSize);
-}
-//
+	for (auto const& b: theBackends) {
+	   int startAddr	= b -> startAddr ();
+	   int Length		= b -> Length    ();
 
-void	mscHandler::stopProcessing (void) {
-	work_to_be_done	= false;
-}
-
-void	mscHandler::stopHandler	(void) {
-	work_to_be_done	= false;
-	dabHandler	-> stopRunning ();
+	   if (Length > 0) {
+	      int16_t myBegin [Length * CUSize];
+	      memcpy (myBegin, &cifVector [startAddr * CUSize],
+	                               Length * CUSize * sizeof (int16_t));
+	      (void) b -> process (myBegin, Length * CUSize);
+	   }
+	}
+	mutexer. unlock ();
 }
 

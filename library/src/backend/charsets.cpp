@@ -24,6 +24,10 @@
  */
 #include	"charsets.h"
 #include	<stdint.h>
+#include        <cstdio>
+#include        <iostream>
+#include        <stdexcept>
+
 /**
  * This table maps "EBU Latin" charset to corresponding
  * Unicode (UCS2-encoded) characters.
@@ -66,62 +70,24 @@ static const unsigned short ebuLatinToUcs2[] = {
 /* 0xf8 - 0xff */ 0xfe,   0x014b, 0x0155, 0x0107, 0x015b, 0x017a, 0x0167, 0xff
 };
 
-static
-int	GetUtf8CharacterLength (uint8_t utf8Char ) {
+static const char* utf8_encoded_EBU_Latin[] = {
+"\0", "Ę", "Į", "Ų", "Ă", "Ė", "Ď", "Ș", "Ț", "Ċ", "\n","\v","Ġ", "Ĺ", "Ż", "Ń",
+"ą", "ę", "į", "ų", "ă", "ė", "ď", "ș", "ț", "ċ", "Ň", "Ě", "ġ", "ĺ", "ż", "\u0082",
+" ", "!", "\"","#", "ł", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/",
+"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ";", "<", "=", ">", "?",
+"@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O",
+"P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "Ů", "]", "Ł", "_",
+"Ą", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o",
+"p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "«", "ů", "»", "Ľ", "Ħ",
+"á", "à", "é", "è", "í", "ì", "ó", "ò", "ú", "ù", "Ñ", "Ç", "Ş", "ß", "¡", "Ÿ",
+"â", "ä", "ê", "ë", "î", "ï", "ô", "ö", "û", "ü", "ñ", "ç", "ş", "ğ", "ı", "ÿ",
+"Ķ", "Ņ", "©", "Ģ", "Ğ", "ě", "ň", "ő", "Ő", "€", "£", "$", "Ā", "Ē", "Ī", "Ū",
+"ķ", "ņ", "Ļ", "ģ", "ļ", "İ", "ń", "ű", "Ű", "¿", "ľ", "°", "ā", "ē", "ī", "ū",
+"Á", "À", "É", "È", "Í", "Ì", "Ó", "Ò", "Ú", "Ù", "Ř", "Č", "Š", "Ž", "Ð", "Ŀ",
+"Â", "Ä", "Ê", "Ë", "Î", "Ï", "Ô", "Ö", "Û", "Ü", "ř", "č", "š", "ž", "đ", "ŀ",
+"Ã", "Å", "Æ", "Œ", "ŷ", "Ý", "Õ", "Ø", "Þ", "Ŋ", "Ŕ", "Ć", "Ś", "Ź", "Ť", "ð",
+"ã", "å", "æ", "œ", "ŵ", "ý", "õ", "ø", "þ", "ŋ", "ŕ", "ć", "ś", "ź", "ť", "ħ"};
 
-	if (utf8Char < 0x80)
-	   return 1;
-	else
-	if ((utf8Char & 0x20) == 0)
-	   return 2;
-	else
-	if ((utf8Char & 0x10) == 0)
-	   return 3;
-	else
-	if ((utf8Char & 0x08) == 0)
-	   return 4;
-	else
-	if ((utf8Char & 0x04) == 0)
-	   return 5;
-	return 6;
-}
-
-static
-char	Utf8toLatin1Character (const char *s, int16_t *index) {
-int16_t len = GetUtf8CharacterLength (s [*index]);
-
-	if (len == 1) {
-	   char c = s [*index];
-	   (*index) ++;
-	   return c;
-	}
-	uint32_t v = (s [*index] & (0xff >> (len + 1))) <<
-	                               ((len - 1) * 6);
-	(*index) ++;
-	for (len --; len > 0; len --) {
-	   v |= (s [*index] -0x80) << ((len - 1) * 6);
-	   (*index) ++;
-	}
-
-	return (v > 0xff) ? 0 : (char)v;
-}
-
-static
-std::string fromUtf8 (const char *buffer, int16_t length) {
-int16_t readIndex;
-std::string result;
-
-	for (readIndex = 0; readIndex < length; ) {
-	   if (buffer [readIndex] == 0)
-	      return result;
-
-	   char c = Utf8toLatin1Character (buffer, &readIndex);
-	   if (c == 0)
-	      c = '_';
-	   result += c;
-	}
-	return result;
-}
 
 std::string toStringUsingCharset (const char* buffer,
 	                          CharacterSet charset, int size) {
@@ -135,20 +101,21 @@ uint16_t i;
 	   length = size;
 
 	switch (charset) {
-//	   case UnicodeUcs2:
-//	      s = std::string::fromUtf16 ((const ushort*) buffer, length);
-//	      break;
+	   case UnicodeUcs2:
+	      throw std::logic_error("UnicodeUcs2 to Utf8 not yet implemented");
+	      break;
 
 	   case UnicodeUtf8:
-	      s = fromUtf8 (buffer, length);
+	   case IsoLatin:
+	   default:
+	      for (i = 0; i < length; i ++)
+	         s. push_back (buffer [i]);
 	      break;
 
 	   case EbuLatin:
-	   default:
-	      for (i = 0; i < length; i++) {
-	         s	+= buffer [i];
-//	         s [i] = char (ebuLatinToUcs2 [((uint8_t*) buffer)[i]]);
-	      }
+	      for (i = 0; i < length; i++) 
+	         s. append (utf8_encoded_EBU_Latin [buffer[i] & 0xff]);
+	      break;
 	}
 
 	return s;

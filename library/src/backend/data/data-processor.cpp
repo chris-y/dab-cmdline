@@ -1,28 +1,29 @@
+#
 /*
  *    Copyright (C) 2015
  *    Jan van Katwijk (J.vanKatwijk@gmail.com)
  *    Lazy Chair Programming
  *
- *    This file is part of dab library
- *    dab library is free software; you can redistribute it and/or modify
+ *    This file is part of DAB library
+ *    DAB library is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation; either version 2 of the License, or
  *    (at your option) any later version.
  *
- *    dab library is distributed in the hope that it will be useful,
+ *    DAB library is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *    GNU General Public License for more details.
  *
  *    You should have received a copy of the GNU General Public License
- *    along with dab library; if not, write to the Free Software
+ *    along with DAB library; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #
 #include	"dab-constants.h"
 #include	"data-processor.h"
 #include	"virtual-datahandler.h"
-#include	"mot-databuilder.h"
+#include	"mot-handler.h"
 #include        "tdc-datahandler.h"
 
 //	\class dataProcessor
@@ -31,37 +32,34 @@
 //
 //	fragmentsize == Length * CUSize
 	dataProcessor::dataProcessor	(int16_t	bitRate,
-	                         	 uint8_t	DSCTy,
-	                                 int16_t	appType,
-	                                 uint8_t	DGflag,
-	                         	 int16_t	FEC_scheme,
-	                                 bool		show_crcErrors) {
+	                                 packetdata	*pd,
+	                                 bytesOut_t	bytesOut,
+	                                 motdata_t	motdataHandler,
+	                                 void	        *ctx) {
 
-	this	-> bitRate		= bitRate;
-	this	-> DSCTy		= DSCTy;
-	this	-> appType		= appType;
-	this	-> DGflag		= DGflag;
-	this	-> FEC_scheme		= FEC_scheme;
-	this	-> show_crcErrors	= show_crcErrors;
+	this	-> bitRate		= pd -> bitRate;
+	this	-> DSCTy		= pd -> DSCTy;
+	this	-> appType		= pd -> appType;
+	this	-> packetAddress	= pd -> packetAddress;
+	this	-> DGflag		= pd -> DGflag;
+	this	-> FEC_scheme		= pd -> FEC_scheme;
+	this	-> bytesOut		= bytesOut;
+	this	-> ctx			= ctx;
 	switch (DSCTy) {
 	   default:
 	      my_dataHandler	= new virtual_dataHandler ();
 	      break;
 
 	   case 5:			// do know yet
-	      my_dataHandler	= new tdc_dataHandler (appType);
+	      my_dataHandler	= new tdc_dataHandler (appType, bytesOut, ctx);
 	      break;
 
 	   case 60:
-	      my_dataHandler	= new mot_databuilder ();
+	      my_dataHandler	= new motHandler (motdataHandler, ctx);
 	      break;
 	}
 
 	packetState	= 0;
-	streamAddress	= -1;
-//
-	handledPackets	= 0;
-	crcErrors	= 0;
 }
 
 	dataProcessor::~dataProcessor	(void) {
@@ -110,11 +108,6 @@ uint16_t	i;
 //	if (usefulLength > 0)
 //	fprintf (stderr, "CI = %d, address = %d, usefulLength = %d\n",
 //	                 continuityIndex, address, usefulLength);
-	if (show_crcErrors && (++handledPackets >= 500)) {
-//	we could do something here
-	   crcErrors	= 0;
-	   handledPackets = 0;
-	}
 
 	(void)continuityIndex;
 	(void)command;
@@ -125,11 +118,7 @@ uint16_t	i;
 	if (address == 0)
 	   return;		// padding packet
 //
-//	In this early stage we only collect packets for a single
-//	i.e. the first, stream
-	if (streamAddress == -1)
-	   streamAddress = address;
-	if (streamAddress != address)	// sorry
+	if (address != packetAddress)	// sorry, other stream
 	   return;
 	
 //	assemble the full MSC datagroup
@@ -201,4 +190,4 @@ int16_t	usefulLength	= getBits_7 (data, 17);
 	if (!check_CRC_bits (data, packetLength * 8))
 	   return;
 }
-//
+

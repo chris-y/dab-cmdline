@@ -30,7 +30,7 @@
 #include	"dab-constants.h"
 #include	<stdio.h>
 #include	<stdint.h>
-#include	"dab-processor.h"
+#include	"backend-base.h"
 #include	"dab-api.h"
 #include	"firecode-checker.h"
 #include	"reed-solomon.h"
@@ -38,12 +38,13 @@
 #include	"pad-handler.h"
 
 
-class	mp4Processor : public dabProcessor {
+class	mp4Processor : public backendBase {
 public:
 			mp4Processor	(int16_t,
 	                                 audioOut_t,
 	                                 dataOut_t,
 	                                 programQuality_t,
+	                                 motdata_t,
 	                                 void	*);
 			~mp4Processor	(void);
 	void		addtoFrame	(uint8_t *);
@@ -55,13 +56,12 @@ private:
 	void		*ctx;
 	padHandler	my_padHandler;
 	void            handle_aacFrame (uint8_t *,
-                                         int16_t,
-                                         uint8_t,
-                                         uint8_t,
-                                         uint8_t,
-                                         uint8_t,
-                                         bool*);
-
+	                                 int16_t frame_length,
+	                                 stream_parms *sp,
+	                                 bool*);
+	void		buildHeader (int16_t framelen,
+                                     stream_parms *sp,
+                                     uint8_t *header);
 	int16_t		superFramesize;
 	int16_t		blockFillIndex;
 	int16_t		blocksInBuffer;

@@ -38,10 +38,14 @@ struct timeval	tv;
 
 #define	__BUFFERSIZE	8 * 32768
 
-	wavFiles::wavFiles (std::string f) {
+	wavFiles::wavFiles (std::string f, bool repeater) {
 SF_INFO *sf_info;
 
 	fileName	= f;
+	this	-> repeater	= repeater;
+	this	-> eofHandler	= nullptr;
+	this	-> userData	= nullptr;
+	
 	_I_Buffer	= new RingBuffer<std::complex<float>>(__BUFFERSIZE);
 
 	sf_info		= (SF_INFO *)alloca (sizeof (SF_INFO));
@@ -54,37 +58,73 @@ SF_INFO *sf_info;
 	}
 	if ((sf_info -> samplerate != 2048000) ||
 	    (sf_info -> channels != 2)) {
-	   fprintf (stderr, "This is not a recorded dab file, sorry\n");
+	   fprintf (stderr, "This is not a recorded DAB file, sorry\n");
 	   sf_close (filePointer);
 	   throw (25);
 	}
 	currPos		= 0;
+	running. store (false);
+}
+
+	wavFiles::wavFiles (std::string f,
+	                    double fileOffsetInSeconds,
+	                    device_eof_callback_t eofHandler,
+	                    void * userData) {
+SF_INFO *sf_info;
+
+	fileName		= f;
+	repeater		= false;
+	this	-> eofHandler	= eofHandler;
+	this	-> userData	= userData;
+	_I_Buffer	= new RingBuffer<std::complex<float>>(__BUFFERSIZE);
+
+	sf_info		= (SF_INFO *)alloca (sizeof (SF_INFO));
+	sf_info	-> format	= 0;
+	filePointer	= sf_open (f. c_str (), SFM_READ, sf_info);
+	if (filePointer == NULL) {
+	   fprintf (stderr, "file %s no legitimate sound file\n", 
+	                                f. c_str ());
+	   throw (24);
+	}
+	if ((sf_info -> samplerate != 2048000) ||
+	    (sf_info -> channels != 2)) {
+	   fprintf (stderr, "This is not a recorded DAB file, sorry\n");
+	   sf_close (filePointer);
+	   throw (25);
+	}
+	currPos = (int64_t)(fileOffsetInSeconds * 2048000.0 );
+	sf_seek (filePointer, (sf_count_t)currPos, SEEK_SET);
+	running. store (false);
 }
 
 	wavFiles::~wavFiles (void) {
-	if (running)
+	if (running. load ())
 	   workerHandle. join ();
-	running = false;
+	running. store (false);
 	sf_close (filePointer);
 	delete _I_Buffer;
 }
 
 bool	wavFiles::restartReader	(void) {
-	workerHandle = std::thread (wavFiles::run, this);
-	running = true;
+	workerHandle = std::thread (&wavFiles::run, this);
+	running. store (true);
 	return true;
 }
 
 void	wavFiles::stopReader	(void) {
-	if (running)
+	if (running. load ()) {
+	   running. store (false);
            workerHandle. join ();
-	running = false;
+	}
+	running. store (false);
 }
 //
 //	size is in I/Q pairs
 int32_t	wavFiles::getSamples	(std::complex<float> *V, int32_t size) {
 int32_t	amount;
 	if (filePointer == NULL)
+	   return 0;
+	if (!running. load ())
 	   return 0;
 
 	while (_I_Buffer -> GetRingBufferReadAvailable () < (uint32_t)size)
@@ -97,34 +137,43 @@ int32_t	amount;
 int32_t	wavFiles::Samples (void) {
 	return _I_Buffer -> GetRingBufferReadAvailable ();
 }
+//
+//	The actual interface to the filereader is in a separate thread
 
-void	wavFiles::run (wavFiles *p) {
+void	wavFiles::run (void) {
 int32_t	t, i;
 std::complex<float>	*bi;
 int32_t	bufferSize	= 32768;
 int64_t	period;
 int64_t	nextStop;
+bool	eofReached	= false;
 
-	p -> running = true;
+	running. store (true);
 	period		= (32768 * 1000) / 2048;	// full IQś read
 	fprintf (stderr, "Period = %ld\n", period);
 	bi		= new std::complex<float> [bufferSize];
 	nextStop	= getMyTime ();
-	while (p -> running) {
-	   while (p -> _I_Buffer -> WriteSpace () < bufferSize) {
-	      if (!p -> running)
+	while (running. load ()) {
+	   while (_I_Buffer -> WriteSpace () < bufferSize) {
+	      if (!running. load ())
 	         break;
 	      usleep (100);
 	   }
 
 	   nextStop += period;
-	   t = p -> readBuffer (bi, bufferSize);
+	   t = readBuffer (bi, bufferSize);
 	   if (t < bufferSize) {
+	      eofReached	= true;
 	      for (i = t; i < bufferSize; i ++)
 	          bi [i] = 0;
 	      t = bufferSize;
 	   }
-	   p -> _I_Buffer -> putDataIntoBuffer (bi, bufferSize);
+	   _I_Buffer -> putDataIntoBuffer (bi, bufferSize);
+	   if (eofReached) {
+	      if (eofHandler != nullptr)
+	         eofHandler (userData);
+	      eofReached	= false;
+	   }
 	   if (nextStop - getMyTime () > 0)
 	      usleep (nextStop - getMyTime ());
 	}
@@ -141,7 +190,7 @@ float	temp [2 * length];
 	n = sf_readf_float (filePointer, temp, length);
 	if (n < length) {
 	   sf_seek (filePointer, 0, SEEK_SET);
-	   fprintf (stderr, "End of file, restarting\n");
+//	   fprintf (stderr, "End of file, restarting\n");
 	}
 	for (i = 0; i < n; i ++)
 	   data [i] = std::complex<float> (temp [2 * i], temp [2 * i + 1]);

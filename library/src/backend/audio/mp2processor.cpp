@@ -221,11 +221,15 @@ struct quantizer_spec quantizer_table [17] = {
 	                            audioOut_t		soundOut,
 	                            dataOut_t		dataOut,
 	                            programQuality_t	mscQuality,
+	                            motdata_t		motdata_Handler,
 	                            void		*ctx):
-	                                       my_padHandler (dataOut, ctx) {
+	                                       my_padHandler (dataOut,
+	                                                      motdata_Handler,
+	                                                      ctx) {
 int16_t	i, j;
 int16_t *nPtr = &N [0][0];
 
+	this	-> ctx	= ctx;
 	// compute N[i][j]
 	for (i = 0;  i < 64;  i ++)
 	   for (j = 0;  j < 32;  ++j)
@@ -375,7 +379,7 @@ int32_t table_idx;
 
 	numberofFrames ++;
 	if (numberofFrames >= 50) {
-	   if (mscQuality != NULL)
+	   if (mscQuality != nullptr)
 	      mscQuality (2 * (50 - errorFrames), 0, 0, ctx);
 	   numberofFrames	= 0;
 	   errorFrames		= 0;
@@ -419,11 +423,11 @@ int32_t table_idx;
 	   get_bits(2);
 	   bound = (mode == MONO) ? 0 : 32;
 	}
-	*stereo	= (mode == JOINT_STEREO);
+	*stereo	= ((mode == JOINT_STEREO) || (mode == STEREO));
 
 // discard the last 4 bits of the header and the CRC value, if present
 	get_bits(4);
-	if ((frame[1] & 1) == 0)
+	if ((frame [1] & 1) == 0)
 	   get_bits(16);
 
 // compute the frame size
@@ -599,11 +603,16 @@ int16_t vLength = 24 * bitRate / 8;
 	      if (MP2bitCount >= lf) {
 	         bool stereo;
 	         int16_t sample_buf [KJMP2_SAMPLES_PER_FRAME * 2];
+#ifdef	AAC_OUT
+	         soundOut ((int16_t *)(&MP2frame [0]), MP2bitCount,
+	                               0, false, nullptr);
+#else
 	         if (mp2decodeFrame (MP2frame, sample_buf, &stereo)) {
 	            output (sample_buf,
 	                    2 * (int32_t)KJMP2_SAMPLES_PER_FRAME,
 	                    baudRate, stereo);
 	         }
+#endif
 
 	         MP2Header_OK = 0;
 	         MP2headerCount = 0;
@@ -647,7 +656,7 @@ uint8_t	newbyte = (01 << bitnr);
 }
 
 void	mp2Processor::output (int16_t *buffer, int size, int rate, bool stereo) {
-	if (soundOut != NULL)
+	if (soundOut != nullptr)
 	   soundOut (buffer, size, rate, stereo, ctx);
 }
 

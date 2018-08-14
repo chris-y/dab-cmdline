@@ -1,7 +1,9 @@
 cmake_minimum_required( VERSION 2.8.11 )
-set (objectName dab_cmdline)
-set (CMAKE_CXX_FLAGS "${CMAKE_XCC_FLAGS} -Wall -std=c++11 -flto")
-set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+set (objectName dab_cmdline-2)
+#set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -flto")
+#set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -g")
+set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set (CMAKE_INSTALL_PREFIX "/usr/local/bin" CACHE PATH "default install path" FORCE )
 endif()
@@ -44,10 +46,24 @@ endif ()
 
 if(DEFINED WAVFILES)
    set(WAVFILES true)
-   set(objectName dab-files)
+   set(objectName dab-files-2)
 endif ()
 
-#
+if(DEFINED RAWFILES)
+   set(RAWFILES true)
+   set(objectName dab-raw-2)
+endif ()
+
+if(DEFINED RTL_TCP)
+   set(RTL_TCP true)
+   set(objectName dab-rtl_tcp-2)
+endif ()
+
+if (DEFINED_SERVER)
+    add_definitions(-DHAVE_SERVER)
+endif ()
+
+#add_definitions (-D__THREADED_DECODING)
 #########################################################################
 	find_package (PkgConfig)
 
@@ -61,20 +77,6 @@ endif ()
             message(FATAL_ERROR "please install libfaad")
         endif ()
 
-        find_package(zlib)
-	if (NOT ZLIB_FOUND)
-            message(FATAL_ERROR "please install libz")
-        endif ()
-	list(APPEND extraLibs ${ZLIB_LIBRARY})
-
-
-	find_library (PTHREADS pthread)
-	if (NOT(PTHREADS))
-	   message (FATAL_ERROR "please install libpthread")
-	else (NOT(PTHREADS))
-	   set (extraLibs ${extraLibs} ${PTHREADS})
-	endif (NOT(PTHREADS))
-
 
         find_package(LibSampleRate)
         if (NOT LIBSAMPLERATE_FOUND)
@@ -82,17 +84,30 @@ endif ()
         endif ()
         list(APPEND extraLibs ${LIBSAMPLERATE_LIBRARY})
 
-        find_package(Portaudio)
-        if (NOT PORTAUDIO_FOUND)
-            message(FATAL_ERROR "please install portaudio V19")
-        endif ()
-        list(APPEND extraLibs ${PORTAUDIO_LIBRARIES})
 #########################################################################
         find_package (PkgConfig)
 
 ##########################################################################
 #	The devices
 #
+
+	if (RTL_TCP)
+	   include_directories (
+	     ../devices/rtl_tcp
+	   )
+	   set ($(objectName)_HDRS
+	        ${${objectName}_HDRS}
+	        ../devices/rtl_tcp/rtl_tcp-client.h
+           )
+
+	   set (${objectName}_SRCS
+	        ${${objectName}_SRCS}
+	        ../devices/rtl_tcp/rtl_tcp-client.cpp
+	   )
+
+	 add_definitions (-DHAVE_RTL_TCP)
+	endif (RTL_TCP)
+	
 	if (SDRPLAY)
 	   find_path (SDRPLAYLIB_INCLUDE_DIR
                       NAMES mirsdrapi-rsp.h
@@ -100,6 +115,13 @@ endif ()
                       /usr/local/include/
 	   )
            include_directories (${SDRPLAYLIB_INCLUDE_DIR})
+
+           find_library (SDRPLAYLIB mirsdrapi-rsp)
+           if(NOT(SDRPLAYLIB))
+              message(FATAL_ERROR "please install -lmirsdrapi-rsp")
+           else(NOT(SDRPLAYLIB))
+              list (APPEND extraLibs ${SDRPLAYLIB})
+           endif(NOT(SDRPLAYLIB))
 
 	   include_directories (
 	     ../devices/sdrplay-handler
@@ -167,6 +189,25 @@ endif ()
 	   add_definitions (-DHAVE_RTLSDR)
 	endif()
 
+        find_package(Portaudio)
+        if (NOT PORTAUDIO_FOUND)
+            message(FATAL_ERROR "please install portaudio V19")
+        endif ()
+        list(APPEND extraLibs ${PORTAUDIO_LIBRARIES})
+
+        find_package(zlib)
+	if (NOT ZLIB_FOUND)
+            message(FATAL_ERROR "please install libz")
+        endif ()
+	list(APPEND extraLibs ${ZLIB_LIBRARY})
+
+	find_library (PTHREADS pthread)
+	if (NOT(PTHREADS))
+	   message (FATAL_ERROR "please install libpthread")
+	else (NOT(PTHREADS))
+	   set (extraLibs ${extraLibs} ${PTHREADS})
+	endif (NOT(PTHREADS))
+
 	if (WAVFILES)
 	   include_directories (
 	        ../devices/wavfiles/
@@ -189,6 +230,24 @@ endif ()
 
 	   add_definitions (-DHAVE_WAVFILES)
 	endif()
+
+	if (RAWFILES)
+	   include_directories (
+	        ../devices/rawfiles/
+	   )
+
+	   set (${objectName}_HDRS
+	        ${${objectName}_HDRS}
+	        ../devices/rawfiles/rawfiles.h
+	   )
+
+	   set (${objectName}_SRCS
+	        ${${objectName}_SRCS}
+	        ../devices/rawfiles/rawfiles.cpp
+	   )
+
+	   add_definitions (-DHAVE_RAWFILES)
+	endif()
 #######################################################################
 #
 #	Here we really start
@@ -197,16 +256,18 @@ endif ()
 	           ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
 	           .
 	           ./
+	           ./server-thread
 	           ../
 	           ../library
 	           ../library/includes
 	           ../library/includes/ofdm
 	           ../library/includes/backend
-	           ../library/includes/backend/viterbi_768
 	           ../library/includes/backend/audio
 	           ../library/includes/backend/data
+	           ../library/includes/backend/data/mot
 	           ../library/includes/backend/data/journaline
-	           ../library/includes/various
+	           ../library/includes/support
+	           ../library/includes/support/viterbi_768
 	           /usr/include/
 	)
 
@@ -216,39 +277,47 @@ endif ()
 	     ./band-handler.h
 	     ./audio-base.h
 	     ./audiosink.h
+	     ./filesink.h
 	     ./newconverter.h
+	     ./server-thread/tcp-server.h
+	     ../dab-api.h
 	     ../devices/device-handler.h
-	     ../library/includes/dab-class.h
 	     ../library/includes/dab-constants.h
-	     ../library/includes/ofdm/ofdm-processor.h
+	     ../library/includes/dab-processor.h
 	     ../library/includes/ofdm/phasereference.h
 	     ../library/includes/ofdm/phasetable.h
 	     ../library/includes/ofdm/freq-interleaver.h
-	     ../library/includes/backend/viterbi_768/viterbi-768.h
-	     ../library/includes/backend/protection.h
-	     ../library/includes/backend/uep-protection.h
-	     ../library/includes/backend/eep-protection.h
+	     ../library/includes/ofdm/timesyncer.h
+	     ../library/includes/ofdm/fic-handler.h
+	     ../library/includes/ofdm/fib-processor.cpp
+	     ../library/includes/ofdm/sample-reader.h
 	     ../library/includes/backend/firecode-checker.h
-	     ../library/includes/backend/dab-processor.h
-	     ../library/includes/backend/dab-virtual.h
+	     ../library/includes/backend/backend-base.h
 	     ../library/includes/backend/charsets.h
 	     ../library/includes/backend/galois.h
-	     ../library/includes/backend/msc-handler.h
 	     ../library/includes/backend/reed-solomon.h
-	     ../library/includes/backend/audio/dab-audio.h
+	     ../library/includes/backend/msc-handler.h
+	     ../library/includes/backend/virtual-backend.h
+	     ../library/includes/backend/audio-backend.h
+	     ../library/includes/backend/data-backend.h
 	     ../library/includes/backend/audio/faad-decoder.h
 	     ../library/includes/backend/audio/mp4processor.h 
 	     ../library/includes/backend/audio/mp2processor.h 
-	     ../library/includes/backend/data/mot-databuilder.h 
 	     ../library/includes/backend/data/virtual-datahandler.h 
 	     ../library/includes/backend/data/tdc-datahandler.h 
 	     ../library/includes/backend/data/pad-handler.h 
-	     ../library/includes/backend/data/mot-data.h 
-	     ../library/includes/backend/data/dab-data.h
+	     ../library/includes/backend/data/mot/mot-handler.h 
+	     ../library/includes/backend/data/mot/mot-dir.h 
+	     ../library/includes/backend/data/mot/mot-object.h 
 	     ../library/includes/backend/data/data-processor.h
-	     ../library/includes/various/fft.h
-	     ../library/includes/various/dab-params.h
-	     ../library/includes/various/tii_table.h
+	     ../library/includes/support/viterbi_768/viterbi-768.h
+	     ../library/includes/support/protTables.h
+	     ../library/includes/support/protection.h
+	     ../library/includes/support/uep-protection.h
+	     ../library/includes/support/eep-protection.h
+	     ../library/includes/support/fft_handler.h
+	     ../library/includes/support/dab-params.h
+	     ../library/includes/support/tii_table.h
 	)
 
 	set (${objectName}_SRCS
@@ -256,43 +325,48 @@ endif ()
 	     ./main.cpp
 	     ./audio-base.cpp
 	     ./audiosink.cpp
+	     ./filesink.cpp
 	     ./newconverter.cpp
 	     ./band-handler.cpp
+	     ./server-thread/tcp-server.cpp
 	     ../devices/device-handler.cpp
-	     ../library/src/dab-class.cpp
-	     ../library/src/ofdm/ofdm-processor.cpp
+	     ../library/dab-api.cpp
+	     ../library/src/dab-processor.cpp
 	     ../library/src/ofdm/ofdm-decoder.cpp
 	     ../library/src/ofdm/phasereference.cpp
 	     ../library/src/ofdm/phasetable.cpp
 	     ../library/src/ofdm/freq-interleaver.cpp
-	     ../library/src/backend/viterbi_768/viterbi-768.cpp
-	     ../library/src/backend/viterbi_768/spiral-no-sse.c
-	     ../library/src/backend/fic-handler.cpp
-	     ../library/src/backend/msc-handler.cpp
-	     ../library/src/backend/protection.cpp
-	     ../library/src/backend/eep-protection.cpp
-	     ../library/src/backend/uep-protection.cpp
-	     ../library/src/backend/fib-processor.cpp
+	     ../library/src/ofdm/timesyncer.cpp
+	     ../library/src/ofdm/sample-reader.cpp
+	     ../library/src/ofdm/fib-processor.cpp
+	     ../library/src/ofdm/fic-handler.cpp
 	     ../library/src/backend/firecode-checker.cpp
-	     ../library/src/backend/dab-virtual.cpp
-	     ../library/src/backend/dab-processor.cpp
-	     ../library/src/backend/protTables.cpp
+	     ../library/src/backend/backend-base.cpp
 	     ../library/src/backend/charsets.cpp
 	     ../library/src/backend/galois.cpp
 	     ../library/src/backend/reed-solomon.cpp
-	     ../library/src/backend/audio/dab-audio.cpp
+	     ../library/src/backend/msc-handler.cpp
+	     ../library/src/backend/virtual-backend.cpp
+	     ../library/src/backend/audio-backend.cpp
+	     ../library/src/backend/data-backend.cpp
 	     ../library/src/backend/audio/mp4processor.cpp 
 	     ../library/src/backend/audio/mp2processor.cpp 
-	     ../library/src/backend/data/mot-databuilder.cpp 
 	     ../library/src/backend/data/virtual-datahandler.cpp 
 	     ../library/src/backend/data/tdc-datahandler.cpp 
 	     ../library/src/backend/data/pad-handler.cpp 
-	     ../library/src/backend/data/mot-data.cpp 
-	     ../library/src/backend/data/dab-data.cpp
+	     ../library/src/backend/data/mot/mot-handler.cpp 
+	     ../library/src/backend/data/mot/mot-dir.cpp 
+	     ../library/src/backend/data/mot/mot-object.cpp 
 	     ../library/src/backend/data/data-processor.cpp
-	     ../library/src/various/fft.cpp
-	     ../library/src/various/dab-params.cpp
-	     ../library/src/various/tii_table.cpp
+	     ../library/src/support/viterbi_768/viterbi-768.cpp
+	     ../library/src/support/viterbi_768/spiral-no-sse.c
+	     ../library/src/support/protTables.cpp
+	     ../library/src/support/protection.cpp
+	     ../library/src/support/eep-protection.cpp
+	     ../library/src/support/uep-protection.cpp
+	     ../library/src/support/fft_handler.cpp
+	     ../library/src/support/dab-params.cpp
+	     ../library/src/support/tii_table.cpp
 	)
 
 #
