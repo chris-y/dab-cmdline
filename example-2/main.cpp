@@ -498,6 +498,7 @@ bool	err;
 	   exit (22);
 	}
 
+/*
 	run. store (true);
 	std::cerr << "we try to start program " <<
                                                  programName << "\n";
@@ -510,7 +511,7 @@ bool	err;
 
 
 	run.load();
-/*
+
 	while (run. load ())
 	   sleep (1);
    */
