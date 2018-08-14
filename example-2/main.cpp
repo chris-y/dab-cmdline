@@ -276,13 +276,13 @@ bool	err;
 	timeSynced.	store (false);
 	timesyncSet.	store (false);
 	run.		store (false);
-	std::wcout.imbue(std::locale("en_US.utf8"));
+	std::wcout.imbue(std::locale("en_GB.utf8"));
 	if (argc == 1) {
 	   printOptions ();
 	   exit (1);
 	}
 
-	std::setlocale (LC_ALL, "en-US.utf8");
+	std::setlocale (LC_ALL, "en-GB.utf8");
 
 //	For file input we do not need options like Q, G and C,
 //	We do need an option to specify the filename
