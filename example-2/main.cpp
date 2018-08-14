@@ -488,7 +488,7 @@ bool	err;
 	}
 
 	//wait all available time
-	while(--freqSyncTime >= 0)) {
+	while(--freqSyncTime >= 0) {
 		sleep(1);
 	}
 
