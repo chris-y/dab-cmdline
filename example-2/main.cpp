@@ -514,6 +514,12 @@ bool	err;
 	   std::cerr << freqSyncTime + 1 << "\r";
 	   sleep (1);
 	}
+
+	//wait all available time
+	while(--freqSyncTime >= 0)) {
+		sleep(1);
+	}
+
 	std::cerr << "\n";
 
 	if (!ensembleRecognized. load ()) {
@@ -526,8 +532,7 @@ bool	err;
 	   exit (22);
 	}
 
-/*
-	run. store (true);
+//	run. store (true);
 	std::cerr << "we try to start program " <<
                                                  programName << "\n";
 	audiodata ad;
@@ -555,13 +560,24 @@ bool	err;
 	      run. store (false);
 	   }
 	}
-
+*/
 	if (run. load ()) {
 	   dabReset_msc (theRadio);
-	   set_audioChannel (theRadio, &ad);
-	}
-*/
+//	   set_audioChannel (theRadio, &ad);
+//	}
 
+
+//	   run. store (false);
+	} else {
+
+		dataforAudioService(theRadio, programName.c_str(),
+			&ad, 0);
+
+		fprintf(stderr, "bitrate: %d\n", ad.bitRate);
+	}
+
+//	run.store(false);
+/*
 	run.load();
 
 	while (run. load ())
