@@ -80,6 +80,12 @@ std::atomic<bool>ensembleRecognized;
 static
 audioBase	*soundOut	= NULL;
 
+static
+uint32_t serviceID[50];
+
+static
+int32_t numServices = 0;
+
 #ifdef	DATA_STREAMER
 tcpServer	tdcServer (8888);
 #endif
@@ -128,7 +134,9 @@ void	programnameHandler (std::string s, int SId, void *userdata) {
 	programNames. push_back (s);
 	programSIds . push_back (SId);
 	std::cerr << "program " << s << " is part of the ensemble\n";
-	fprintf(stdout, "@program;%s;%X\n", s.c_str(), SId);
+	//fprintf(stdout, "@program;%s;%X\n", s.c_str(), SId);
+	serviceID[numServices] = SId;
+	numServices++;
 }
 
 static
@@ -505,6 +513,11 @@ bool	err;
 	}
 
 //	run. store (true);
+
+	while(--numServices >= 0) {
+
+	programName = dab_getserviceName(theRadio, serviceID[numServices]);
+
 	std::cerr << "we try to start program " <<
                                                  programName << "\n";
 	audiodata ad;
@@ -517,7 +530,11 @@ bool	err;
 		dataforAudioService(theRadio, programName.c_str(),
 			&ad, 0);
 
-		fprintf(stderr, "bitrate: %d\n", ad.bitRate);
+		if(ad.defined)
+			fprintf(stdout, "@program;%s;%X;%d\n",
+				programName.c_str(), serviceID[numServices], ad.bitRate);
+	}
+
 	}
 
 //	run.store(false);
