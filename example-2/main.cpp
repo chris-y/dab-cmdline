@@ -512,32 +512,53 @@ bool	err;
 	   exit (22);
 	}
 
-//	run. store (true);
+	run. store (true);
 
 	while(--numServices >= 0) {
 
-	programName = dab_getserviceName(theRadio, serviceID[numServices]);
+		int16_t bitrate = 0;
+		int16_t subchid = 0;
+		int16_t progtype = 0;
+		bool data = false;
 
-	std::cerr << "we try to start program " <<
+		programName = dab_getserviceName(theRadio, serviceID[numServices]);
+
+		std::cerr << "we try to start program " <<
                                                  programName << "\n";
-	audiodata ad;
-	if (!is_audioService (theRadio, programName. c_str ())) {
-	   std::cerr << "sorry  we cannot handle service " << 
-	                                         programName << "\n";
-//	   run. store (false);
-	} else {
 
-		dataforAudioService(theRadio, programName.c_str(),
-			&ad, 0);
+		if (is_audioService (theRadio, programName. c_str ())) {
+			audiodata ad;
+			dataforAudioService(theRadio, programName.c_str(),
+				&ad, 0);
 
-		if(ad.defined)
-			fprintf(stdout, "@program;%s;%X;%d\n",
-				programName.c_str(), serviceID[numServices], ad.bitRate);
+			if(ad.defined) {
+				bitrate=ad.bitRate;
+				subchid = ad.subchId;
+				progtype = ad.programType;
+				data = false;
+			}
+		}
+
+		if(is_dataService(theRadio, programName.c_str())) {
+			packetdata pd;
+			dataforDataService(theRadio, programName.c_str(),
+				&pd, 0);
+
+			if(pd.defined) {
+				bitrate = pd.bitRate;
+				subchid = pd.subchId;
+				progtype = pd.appType;
+				data = true;
+			}
+		}
+
+		fprintf(stdout, "@program;%s;%X;%d;%d;%d;%d\n",
+			programName.c_str(), serviceID[numServices],
+			bitrate, subchid, progtype, data);
+
 	}
 
-	}
-
-//	run.store(false);
+	run.store(false);
 /*
 	run.load();
 
