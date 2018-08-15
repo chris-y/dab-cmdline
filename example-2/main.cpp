@@ -517,10 +517,11 @@ bool	err;
 	while(--numServices >= 0) {
 
 		int16_t bitrate = 0;
-		int16_t subchid = 0;
+		int16_t chtype = 0;
 		int16_t progtype = 0;
 		bool data = false;
 
+//		dabReset_msc(theRadio);
 		programName = dab_getserviceName(theRadio, serviceID[numServices]);
 
 		std::cerr << "we try to start program " <<
@@ -533,7 +534,7 @@ bool	err;
 
 			if(ad.defined) {
 				bitrate=ad.bitRate;
-				subchid = ad.subchId;
+				chtype = ad.ASCTy;
 				progtype = ad.programType;
 				data = false;
 			}
@@ -546,7 +547,7 @@ bool	err;
 
 			if(pd.defined) {
 				bitrate = pd.bitRate;
-				subchid = pd.subchId;
+				chtype = pd.DSCTy;
 				progtype = pd.appType;
 				data = true;
 			}
@@ -554,7 +555,7 @@ bool	err;
 
 		fprintf(stdout, "@program;%s;%X;%d;%d;%d;%d\n",
 			programName.c_str(), serviceID[numServices],
-			bitrate, subchid, progtype, data);
+			bitrate, chtype, progtype, data);
 
 	}
 
