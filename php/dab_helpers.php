@@ -39,4 +39,12 @@ function dab_prog_type($type) {
   return progtype[$type];
 }
 
+function dab_is_plus($type) {
+  if($type == 63) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 ?>
