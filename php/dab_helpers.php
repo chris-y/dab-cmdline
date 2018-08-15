@@ -36,7 +36,7 @@ function dab_prog_type($type) {
     "entry 30 not used",
     "entry 31 not used");
 
-  return progtype[$type];
+  return $progtype[$type];
 }
 
 function dab_is_plus($type) {
