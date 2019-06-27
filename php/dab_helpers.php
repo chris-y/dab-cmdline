@@ -21,7 +21,7 @@ function dab_prog_type($type) {
     "Other Music",
     "Weather",
     "Finance",
-    "Children\'s",
+    "Children's",
     "Factual",
     "Religion",
     "Phone In",
