@@ -128,7 +128,6 @@ std::vector<int> programSIds;
 std::unordered_map <int, std::string> ensembleContents;
 static
 void	programnameHandler (std::string s, int SId, void *userdata) {
-	fprintf (stdout, "@program;%s;%X\n", s. c_str (), SId);
 	for (std::vector<std::string>::iterator it = programNames.begin();
 	             it != programNames. end(); ++it)
 	   if (*it == s)
