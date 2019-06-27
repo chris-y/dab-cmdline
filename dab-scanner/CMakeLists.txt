@@ -1,4 +1,5 @@
 cmake_minimum_required( VERSION 2.8.11 )
+set(RTLSDR true)
 set (objectName dab_scanner)
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -flto")
 #set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -g")
