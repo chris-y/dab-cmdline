@@ -181,6 +181,7 @@ int16_t		latency		= 10;
 int16_t		timeSyncTime	= 5;
 int16_t		freqSyncTime	= 10;
 bool		autogain	= false;
+bool		jsonOutput	= true;
 int	opt;
 struct sigaction sigact;
 bandHandler	dabBand;
@@ -198,7 +199,7 @@ bool	err;
 	   exit (1);
 	}
 
-	while ((opt = getopt (argc, argv, "F:D:d:M:B:p:G:g:QC:")) != -1) {
+	while ((opt = getopt (argc, argv, "F:D:d:M:B:p:G:g:QC:j")) != -1) {
 	   switch (opt) {
 	      case 'F':
 	         outFile	= fopen (optarg, "w");
@@ -250,6 +251,10 @@ bool	err;
 	      case 'C':
 	         theChannel	= std::string (optarg);
 	         startChannel	= theChannel;
+	         break;
+
+   	      case 'j':
+	         jsonOutput	= true;
 	         break;
 
 	      default:
