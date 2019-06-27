@@ -248,7 +248,7 @@ int	main (int argc, char **argv) {
 uint8_t		theMode		= 1;
 std::string	theChannel	= "11C";
 uint8_t		theBand		= BAND_III;
-int16_t		ppmCorrection	= 0;
+int16_t		ppmCorrection	= 55;
 int		deviceGain	= 45;	// scale = 0 .. 100
 #ifdef	HAVE_HACKRF
 int		lnaGain		= 40;
@@ -555,6 +555,7 @@ bool	err;
 
 		std::cerr << "we try to start program " <<
                                                  programName << "\n";
+
 
 	audiodata ad;
 /*
