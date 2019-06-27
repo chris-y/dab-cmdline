@@ -225,6 +225,7 @@ endif ()
 	     ./ringbuffer.h
 	     ./dab_tables.h
 	     ./service-printer.h
+	     ./service-printer-json.h
 	     ../dab-api.h
 	     ../devices/device-handler.h
 	     ../library/includes/dab-constants.h
@@ -271,6 +272,7 @@ endif ()
 	     ./main.cpp
 	     ./dab_tables.cpp
 	     ./service-printer.cpp
+	     ./service-printer-json.cpp
 	     ../devices/device-handler.cpp
 	     ../library/dab-api.cpp
 	     ../library/src/dab-processor.cpp
