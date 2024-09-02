@@ -32,7 +32,7 @@ list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_SOURCE_DIR}/cmake/Modules)
 #
 ########################################################################
 OPTION(RTLSDR   "Input: RTLSDR"   OFF)
-OPTION(SDRPLAY  "Input: SDRPlay"  OFF)
+OPTION(SDRPLAY  "Input: SDRPLAY"  OFF)
 OPTION(AIRSPY   "Input: AirSpy"   OFF)
 OPTION(HACKRF	"Input: HACKRF"	  OFF)
 OPTION(LIMESDR	"Input: LIMESDR"  OFF)
@@ -495,6 +495,7 @@ endif ()
 	           ./
 	           ./server-thread
 	           ./audio-sink
+	           ../devices
 	           ../
 	           ../library
 	           ../library/includes
@@ -519,6 +520,7 @@ endif ()
 	     ./server-thread/tcp-server.h
 	     ../dab-api.h
 	     ../devices/device-handler.h
+	     ../devices/device-exceptions.h
 	     ../library/includes/dab-constants.h
 	     ../library/includes/dab-processor.h
 	     ../library/includes/ofdm/phasereference.h

@@ -404,13 +404,12 @@ bool	err;
 #endif
 
 	}
-  catch (std::exception& ex) {
-	   std::cerr << "allocating device failed (" << e << "), fatal\n";
-     printf("Exception : %s\n",ex.what());
+	catch (std::exception& ex) {
+	   std::cerr << "allocating device failed (" << ex. what () << "), fatal\n";
 	   exit (1);
 	}
 //
-	if (soundOut == NULL) {	// not bound to a file?
+	if (soundOut == nullptr) {	// not bound to a file?
 	   soundOut	= new audioSink	(latency, soundChannel, &err);
 	   if (err) {
 	      fprintf (stderr, "no valid sound channel, fatal\n");
@@ -591,7 +590,7 @@ int16_t	foundIndex	= -1;
                                  programNames [foundIndex]. c_str ()))
 	   foundIndex = (foundIndex + 1) % programNames. size ();
 
-	programName = programNames [foundIndex];
+	programName	= programNames [foundIndex];
 	fprintf (stderr, "we now try to start program %s\n",
 	                                         programName. c_str ());
 
